@@ -7,6 +7,7 @@ import Animated, {
   withTiming,
   runOnJS,
   useSharedValue,
+  Easing,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { GameScore } from '../../types/game';
@@ -30,8 +31,10 @@ const PLAY_AREA = {
   maxY: SCREEN_HEIGHT - MARGIN.BOTTOM - TARGET_SIZE,
 };
 
-const MOVE_DURATION = 1000;
-const INITIAL_DELAY = 1000;
+// Animation timing constants
+const MOVE_DURATION = 500; // Increased from 300ms to 500ms for slower movement
+const INITIAL_DELAY = 500; // 500ms initial delay
+const MOVE_INTERVAL = 600; // Increased from 400ms to 600ms for more time between movements
 
 interface MovingTargetProps {
   onGameComplete: (score: GameScore) => void;
@@ -39,33 +42,65 @@ interface MovingTargetProps {
 }
 
 export default function MovingTarget({ onGameComplete, gameId }: MovingTargetProps): JSX.Element {
-  const [gameStartTime, setGameStartTime] = useState<number>(0);
-  const [isTargetVisible, setIsTargetVisible] = useState<boolean>(false);
-  const [penalties, setPenalties] = useState<number>(0);
-  const [isGameComplete, setIsGameComplete] = useState<boolean>(false);
+  const [gameStartTime, setGameStartTime] = useState(0);
+  const [penalties, setPenalties] = useState(0);
   const timeoutRef = useRef<NodeJS.Timeout>();
   const moveTimeoutRef = useRef<NodeJS.Timeout>();
-  const isMounted = useRef(true);
 
-  const opacity = useSharedValue<number>(0);
-  const scale = useSharedValue<number>(0.3);
-  const translateX = useSharedValue<number>(0);
-  const translateY = useSharedValue<number>(0);
+  // Use shared values for animation and game state
+  const isVisible = useSharedValue(false);
+  const isComplete = useSharedValue(false);
+  const opacity = useSharedValue(0);
+  const scale = useSharedValue(0.3);
+  const position = useSharedValue({ x: 0, y: 0 });
 
-  // Reset all state when component mounts
+  const getRandomPosition = useCallback(() => {
+    // Ensure the target stays within the playable area
+    const x = Math.random() * (PLAY_AREA.maxX - PLAY_AREA.minX) + PLAY_AREA.minX;
+    const y = Math.random() * (PLAY_AREA.maxY - PLAY_AREA.minY) + PLAY_AREA.minY;
+    return { x, y };
+  }, []);
+
+  const moveTarget = useCallback(() => {
+    if (isComplete.value) return;
+
+    const newPosition = getRandomPosition();
+    position.value = withTiming(newPosition, { 
+      duration: MOVE_DURATION,
+      easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+    });
+
+    moveTimeoutRef.current = setTimeout(moveTarget, MOVE_INTERVAL);
+  }, [position, isComplete]);
+
+  const startGame = useCallback(() => {
+    if (isComplete.value) return;
+
+    const initialPosition = getRandomPosition();
+    position.value = initialPosition;
+
+    timeoutRef.current = setTimeout(() => {
+      if (!isComplete.value) {
+        setGameStartTime(Date.now());
+        isVisible.value = true;
+        opacity.value = withSpring(1, theme.animation.spring.default);
+        scale.value = withSpring(1, theme.animation.spring.default);
+        moveTarget();
+      }
+    }, INITIAL_DELAY);
+  }, [opacity, scale, isVisible, isComplete, position, moveTarget]);
+
+  // Reset and start game on mount
   useEffect(() => {
-    isMounted.current = true;
-    setIsGameComplete(false);
-    setIsTargetVisible(false);
-    setPenalties(0);
-    setGameStartTime(0);
+    isComplete.value = false;
+    isVisible.value = false;
     opacity.value = 0;
     scale.value = 0.3;
-    translateX.value = 0;
-    translateY.value = 0;
+    setPenalties(0);
+    setGameStartTime(0);
+    startGame();
 
     return () => {
-      isMounted.current = false;
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
@@ -73,52 +108,10 @@ export default function MovingTarget({ onGameComplete, gameId }: MovingTargetPro
         clearTimeout(moveTimeoutRef.current);
       }
     };
-  }, []);
-
-  const getRandomPosition = useCallback(() => {
-    // Ensure the target stays within the playable area
-    const x = Math.random() * (PLAY_AREA.maxX - PLAY_AREA.minX) + PLAY_AREA.minX;
-    const y = Math.random() * (PLAY_AREA.maxY - PLAY_AREA.minY) + PLAY_AREA.minY;
-    
-    return { x, y };
-  }, []);
-
-  const moveTarget = useCallback(() => {
-    if (isGameComplete || !isMounted.current) return;
-
-    const newPosition = getRandomPosition();
-    translateX.value = withTiming(newPosition.x, { duration: MOVE_DURATION });
-    translateY.value = withTiming(newPosition.y, { duration: MOVE_DURATION });
-
-    moveTimeoutRef.current = setTimeout(moveTarget, MOVE_DURATION);
-  }, [translateX, translateY, isGameComplete, getRandomPosition]);
-
-  const startGame = useCallback(() => {
-    if (isGameComplete || !isMounted.current) return;
-
-    const initialPosition = getRandomPosition();
-    translateX.value = initialPosition.x;
-    translateY.value = initialPosition.y;
-
-    timeoutRef.current = setTimeout(() => {
-      if (!isGameComplete && isMounted.current) {
-        setGameStartTime(Date.now());
-        setIsTargetVisible(true);
-        opacity.value = withSpring(1, theme.animation.spring.default);
-        scale.value = withSpring(1, theme.animation.spring.default);
-        moveTarget();
-      }
-    }, INITIAL_DELAY);
-  }, [opacity, scale, translateX, translateY, isGameComplete, getRandomPosition, moveTarget]);
-
-  useEffect(() => {
-    if (!isGameComplete) {
-      startGame();
-    }
-  }, [startGame, isGameComplete]);
+  }, [startGame, isComplete, isVisible, opacity, scale]);
 
   const handleTargetPress = useCallback((): void => {
-    if (!isTargetVisible || isGameComplete || !isMounted.current) return;
+    if (!isVisible.value || isComplete.value) return;
 
     const endTime = Date.now();
     const reactionTime = endTime - gameStartTime;
@@ -126,44 +119,46 @@ export default function MovingTarget({ onGameComplete, gameId }: MovingTargetPro
     if (reactionTime < MIN_REACTION_TIME) return;
 
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setIsGameComplete(true);
-    setIsTargetVisible(false);
+    isComplete.value = true;
+    isVisible.value = false;
 
     opacity.value = withTiming(0);
     scale.value = withTiming(0.3);
-    if (isMounted.current) {
-      onGameComplete({
-        gameId,
-        time: reactionTime,
-        penalties,
-        finalScore: reactionTime * (penalties > 0 ? PENALTY_MULTIPLIER : 1),
-      });
-    }
-  }, [isTargetVisible, isGameComplete, gameStartTime, penalties, opacity, scale, onGameComplete, gameId]);
+    onGameComplete({
+      gameId,
+      time: reactionTime,
+      penalties,
+      finalScore: reactionTime * (penalties > 0 ? PENALTY_MULTIPLIER : 1),
+    });
+  }, [isVisible, isComplete, gameStartTime, penalties, opacity, scale, onGameComplete, gameId]);
 
   const handleScreenPress = useCallback((): void => {
-    if (!isTargetVisible || isGameComplete) return;
+    if (!isVisible.value || isComplete.value) return;
 
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     setPenalties(prev => prev + 1);
-  }, [isTargetVisible, isGameComplete]);
+  }, [isVisible, isComplete]);
 
-  const targetStyle = useAnimatedStyle(() => ({
+  // Separate layout and transform animations
+  const layoutStyle = useAnimatedStyle(() => ({
+    left: position.value.x,
+    top: position.value.y,
+  }));
+
+  const animatedStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
-    transform: [
-      { translateX: translateX.value },
-      { translateY: translateY.value },
-      { scale: scale.value },
-    ],
+    transform: [{ scale: scale.value }],
   }));
 
   return (
     <View style={styles.container} onTouchStart={handleScreenPress}>
       <View style={styles.touchArea}>
-        <Animated.View style={[styles.target, targetStyle]}>
-          <TouchableWithoutFeedback onPress={handleTargetPress}>
-            <View style={styles.targetInner} />
-          </TouchableWithoutFeedback>
+        <Animated.View style={[styles.targetWrapper, layoutStyle]}>
+          <Animated.View style={[styles.target, animatedStyle]}>
+            <TouchableWithoutFeedback onPress={handleTargetPress}>
+              <View style={styles.targetInner} />
+            </TouchableWithoutFeedback>
+          </Animated.View>
         </Animated.View>
       </View>
     </View>
@@ -180,12 +175,14 @@ const styles = StyleSheet.create({
     width: '100%',
     backgroundColor: 'transparent',
   },
-  target: {
+  targetWrapper: {
     position: 'absolute',
     width: TARGET_SIZE,
     height: TARGET_SIZE,
-    borderRadius: TARGET_SIZE / 2,
-    backgroundColor: 'transparent',
+  },
+  target: {
+    width: '100%',
+    height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
   },

@@ -13,8 +13,22 @@ import { GameScore } from '../../types/game';
 import { TARGET_SIZE, MIN_REACTION_TIME, PENALTY_MULTIPLIER } from '../../constants/gameConstants';
 import { theme } from '../../constants/theme';
 
-const { width, height } = Dimensions.get('window');
-const PADDING = 80;
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+// Safe area margins to keep targets away from edges
+const MARGIN = {
+  TOP: 150,
+  BOTTOM: 100,
+  HORIZONTAL: 50,
+};
+
+// Calculate actual playable area
+const PLAY_AREA = {
+  minX: MARGIN.HORIZONTAL,
+  maxX: SCREEN_WIDTH - MARGIN.HORIZONTAL - TARGET_SIZE,
+  minY: MARGIN.TOP,
+  maxY: SCREEN_HEIGHT - MARGIN.BOTTOM - TARGET_SIZE,
+};
 
 interface SimpleTapProps {
   onGameComplete: (score: GameScore) => void;
@@ -22,49 +36,26 @@ interface SimpleTapProps {
 }
 
 export default function SimpleTap({ onGameComplete, gameId }: SimpleTapProps): JSX.Element {
-  const [isTargetVisible, setIsTargetVisible] = useState(false);
   const [gameStartTime, setGameStartTime] = useState(0);
   const [penalties, setPenalties] = useState(0);
-  const [isGameComplete, setIsGameComplete] = useState(false);
-  const [position, setPosition] = useState({ x: 0, y: 0 });
   const timeoutRef = useRef<NodeJS.Timeout>();
-  const isMounted = useRef(true);
 
+  // Use shared values for animation and game state
+  const isVisible = useSharedValue(false);
+  const isComplete = useSharedValue(false);
   const opacity = useSharedValue(0);
   const scale = useSharedValue(0.3);
-
-  // Reset all state when component mounts
-  useEffect(() => {
-    isMounted.current = true;
-    setIsGameComplete(false);
-    setIsTargetVisible(false);
-    setPenalties(0);
-    setGameStartTime(0);
-    opacity.value = 0;
-    scale.value = 0.3;
-
-    return () => {
-      isMounted.current = false;
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
-  }, []); // Empty dependency array ensures this only runs on mount/unmount
+  const position = useSharedValue({ x: 0, y: 0 });
 
   const getRandomPosition = useCallback(() => {
-    const maxX = width - PADDING - TARGET_SIZE;
-    const maxY = height - PADDING - TARGET_SIZE;
-    const minX = PADDING;
-    const minY = PADDING + 50;
-
-    return {
-      x: Math.floor(Math.random() * (maxX - minX) + minX),
-      y: Math.floor(Math.random() * (maxY - minY) + minY),
-    };
+    // Ensure the target stays within the playable area
+    const x = Math.random() * (PLAY_AREA.maxX - PLAY_AREA.minX) + PLAY_AREA.minX;
+    const y = Math.random() * (PLAY_AREA.maxY - PLAY_AREA.minY) + PLAY_AREA.minY;
+    return { x, y };
   }, []);
 
   const showTarget = useCallback(() => {
-    if (isGameComplete || !isMounted.current) return;
+    if (isComplete.value) return;
 
     // Clear any existing timeout
     if (timeoutRef.current) {
@@ -74,40 +65,49 @@ export default function SimpleTap({ onGameComplete, gameId }: SimpleTapProps): J
     // Reset animation values
     opacity.value = 0;
     scale.value = 0.3;
-    setIsTargetVisible(false);
+    isVisible.value = false;
 
     // Set new random position
-    const newPosition = getRandomPosition();
-    setPosition(newPosition);
+    position.value = getRandomPosition();
 
     // Show target after random delay (1-2 seconds)
     const delay = Math.random() * 1000 + 1000;
     timeoutRef.current = setTimeout(() => {
-      if (!isGameComplete && isMounted.current) {
+      if (!isComplete.value) {
         setGameStartTime(Date.now());
-        setIsTargetVisible(true);
+        isVisible.value = true;
         opacity.value = withSpring(1);
         scale.value = withSpring(1);
       }
     }, delay);
-  }, [opacity, scale, isGameComplete, getRandomPosition]);
+  }, [opacity, scale, isVisible, isComplete, position]);
 
-  // Start game when component mounts or resets
+  // Reset and start game on mount
   useEffect(() => {
-    if (!isGameComplete) {
-      showTarget();
-    }
-  }, [showTarget, isGameComplete]);
+    isComplete.value = false;
+    isVisible.value = false;
+    opacity.value = 0;
+    scale.value = 0.3;
+    setPenalties(0);
+    setGameStartTime(0);
+    showTarget();
+
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, [showTarget, isComplete, isVisible, opacity, scale]);
 
   const handleScreenPress = useCallback(() => {
-    if (!isTargetVisible && !isGameComplete) {
+    if (!isVisible.value && !isComplete.value) {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       setPenalties(prev => prev + 1);
     }
-  }, [isTargetVisible, isGameComplete]);
+  }, [isVisible, isComplete]);
 
   const handleTargetPress = useCallback(() => {
-    if (!isTargetVisible || isGameComplete || !isMounted.current) return;
+    if (!isVisible.value || isComplete.value) return;
 
     const endTime = Date.now();
     const reactionTime = endTime - gameStartTime;
@@ -115,43 +115,40 @@ export default function SimpleTap({ onGameComplete, gameId }: SimpleTapProps): J
     if (reactionTime < MIN_REACTION_TIME) return;
 
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setIsGameComplete(true);
-    setIsTargetVisible(false);
+    isComplete.value = true;
+    isVisible.value = false;
     
     opacity.value = withTiming(0);
     scale.value = withTiming(0.3, undefined, () => {
-      if (isMounted.current) {
-        runOnJS(onGameComplete)({
-          gameId,
-          time: reactionTime,
-          penalties,
-          finalScore: reactionTime * (penalties > 0 ? PENALTY_MULTIPLIER : 1),
-        });
-      }
+      runOnJS(onGameComplete)({
+        gameId,
+        time: reactionTime,
+        penalties,
+        finalScore: reactionTime * (penalties > 0 ? PENALTY_MULTIPLIER : 1),
+      });
     });
-  }, [isTargetVisible, isGameComplete, gameStartTime, penalties, opacity, scale, onGameComplete, gameId]);
+  }, [isVisible, isComplete, gameStartTime, penalties, opacity, scale, onGameComplete, gameId]);
 
-  const targetStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
+  // Separate layout and transform animations
+  const layoutStyle = useAnimatedStyle(() => ({
+    left: position.value.x,
+    top: position.value.y,
+  }));
+
+  const animatedStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
+    transform: [{ scale: scale.value }],
   }));
 
   return (
     <View style={styles.container}>
       <View style={styles.touchArea} onTouchStart={handleScreenPress}>
-        <Animated.View 
-          style={[
-            styles.target,
-            targetStyle,
-            {
-              left: position.x,
-              top: position.y,
-            }
-          ]}
-        >
-          <TouchableWithoutFeedback onPress={handleTargetPress}>
-            <View style={styles.targetInner} />
-          </TouchableWithoutFeedback>
+        <Animated.View style={[styles.targetWrapper, layoutStyle]}>
+          <Animated.View style={[styles.target, animatedStyle]}>
+            <TouchableWithoutFeedback onPress={handleTargetPress}>
+              <View style={styles.targetInner} />
+            </TouchableWithoutFeedback>
+          </Animated.View>
         </Animated.View>
       </View>
     </View>
@@ -168,10 +165,14 @@ const styles = StyleSheet.create({
     width: '100%',
     backgroundColor: 'transparent',
   },
-  target: {
+  targetWrapper: {
     position: 'absolute',
     width: TARGET_SIZE,
     height: TARGET_SIZE,
+  },
+  target: {
+    width: '100%',
+    height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
   },

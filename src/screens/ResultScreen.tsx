@@ -107,26 +107,25 @@ export default function ResultScreen({
         style={styles.content} 
         entering={FadeIn.duration(theme.animation.timing.normal)}
       >
-        <Animated.View 
-          entering={BounceIn.delay(300)}
-          layout={Layout.springify()}
-          style={[styles.scoreContainer, scoreStyle]}
-        >
-          <Text style={styles.scoreLabel}>Average Reaction Time</Text>
-          <Text style={styles.score}>{averageTime.toFixed(0)}ms</Text>
-          <View style={styles.medalContainer}>
-            <Ionicons 
-              name={averageTime < 250 ? "medal" : averageTime < 350 ? "trophy" : "star"} 
-              size={32} 
-              color={theme.colors.primary.default} 
-            />
-          </View>
+        <Animated.View entering={FadeIn.delay(300)}>
+          <Animated.View 
+            style={[styles.scoreContainer, scoreStyle]}
+          >
+            <Text style={styles.scoreLabel}>Average Reaction Time</Text>
+            <Text style={styles.score}>{averageTime.toFixed(0)}ms</Text>
+            <View style={styles.medalContainer}>
+              <Ionicons 
+                name={averageTime < 250 ? "medal" : averageTime < 350 ? "trophy" : "star"} 
+                size={32} 
+                color={theme.colors.primary.default} 
+              />
+            </View>
+          </Animated.View>
         </Animated.View>
 
         {!hasSubmitted && (
           <Animated.View 
             entering={FadeInDown.delay(600)}
-            layout={Layout.springify()}
             style={styles.submitSection}
           >
             <Text style={styles.submitTitle}>Submit to Leaderboard</Text>
@@ -165,7 +164,6 @@ export default function ResultScreen({
         
         <Animated.View 
           entering={FadeInUp.delay(900)}
-          layout={Layout.springify()}
           style={styles.bottomActions}
         >
           <AnimatedTouchableOpacity 

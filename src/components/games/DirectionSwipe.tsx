@@ -93,8 +93,7 @@ export default function DirectionSwipe({ onGameComplete, gameId }: DirectionSwip
     const delay = Math.random() * 1000 + 500;
     timeoutRef.current = setTimeout(() => {
       if (!isGameComplete) {
-        const startTime = Date.now();
-        setGameStartTime(startTime);
+        setGameStartTime(Date.now());
         setIsTargetVisible(true);
         opacity.value = withSpring(1, ANIMATION_CONFIG);
         scale.value = withSpring(1, ANIMATION_CONFIG);
