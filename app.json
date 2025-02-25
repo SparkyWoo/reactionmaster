@@ -1,35 +1,49 @@
 {
   "expo": {
-    "name": "Reaction Master",
+    "name": "ReactMaster",
     "slug": "reaction-master",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
-    "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#1a1a1a"
-    },
+    "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#1a1a1a",
+          "image": "./assets/splash.png",
+          "imageWidth": 200,
+          "resizeMode": "contain"
+        }
+      ]
+    ],
     "assetBundlePatterns": [
       "**/*"
     ],
-    "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.reactionmaster.app",
-      "buildNumber": "1"
+    "updates": {
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 30000,
+      "url": "https://u.expo.dev/962e7631-a71a-4287-8023-b289494f635e"
+    },
+    "runtimeVersion": {
+      "policy": "sdkVersion"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "962e7631-a71a-4287-8023-b289494f635e"
+      }
     },
     "android": {
+      "package": "com.sparkywoo.reactionmaster",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#1a1a1a"
-      },
-      "package": "com.reactionmaster.app",
-      "versionCode": 1
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#2B0B3F"
+      }
     },
-    "web": {
-      "favicon": "./assets/favicon.png"
+    "ios": {
+      "bundleIdentifier": "com.sparkywoo.reactionmaster",
+      "supportsTablet": true
     }
   }
 }

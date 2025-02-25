@@ -20,6 +20,14 @@ module.exports = function (api) {
         },
       ],
       'react-native-reanimated/plugin',
+      ["module:react-native-dotenv", {
+        "moduleName": "@env",
+        "path": ".env",
+        "blacklist": null,
+        "whitelist": ["EXPO_PUBLIC_SUPABASE_URL", "EXPO_PUBLIC_SUPABASE_ANON_KEY"],
+        "safe": true,
+        "allowUndefined": false
+      }]
     ],
   };
 }; 
