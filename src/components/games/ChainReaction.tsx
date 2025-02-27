@@ -18,18 +18,18 @@ const CHAIN_LENGTH = 7;
 const MIN_DELAY = 50;
 const MAX_DELAY = 200;
 
-// Safe area margins to keep targets away from edges
+// Safe area margins to keep targets away from edges - adjusted to ensure visibility
 const MARGIN = {
-  TOP: 150,
-  BOTTOM: 100,
-  HORIZONTAL: 50,
+  TOP: 120,
+  BOTTOM: 80,
+  HORIZONTAL: 40,
 };
 
-// Calculate actual playable area
+// Calculate actual playable area - adjusted to ensure targets are fully visible
 const PLAY_AREA = {
-  minX: MARGIN.HORIZONTAL + TARGET_SIZE,
+  minX: MARGIN.HORIZONTAL,
   maxX: SCREEN_WIDTH - MARGIN.HORIZONTAL - TARGET_SIZE,
-  minY: MARGIN.TOP + TARGET_SIZE,
+  minY: MARGIN.TOP,
   maxY: SCREEN_HEIGHT - MARGIN.BOTTOM - TARGET_SIZE,
 };
 
@@ -63,24 +63,54 @@ export default function ChainReaction({ onGameComplete, gameId }: ChainReactionP
   const generateTargetPositions = useCallback((): void => {
     console.log('Generating target positions');
     const newPositions: TargetPosition[] = [];
-    const playWidth = PLAY_AREA.maxX - PLAY_AREA.minX;
-    const playHeight = PLAY_AREA.maxY - PLAY_AREA.minY;
+    
+    // Calculate available space
+    const availableWidth = PLAY_AREA.maxX - PLAY_AREA.minX;
+    const availableHeight = PLAY_AREA.maxY - PLAY_AREA.minY;
+    
+    console.log('Available space:', { width: availableWidth, height: availableHeight });
+    
+    if (availableWidth <= 0 || availableHeight <= 0) {
+      console.error('Invalid playable area dimensions');
+      // Fallback to simple positioning if dimensions are invalid
+      for (let i = 0; i < CHAIN_LENGTH; i++) {
+        newPositions.push({
+          x: SCREEN_WIDTH / 2,
+          y: SCREEN_HEIGHT / 2
+        });
+      }
+      setPositions(newPositions);
+      return;
+    }
     
     // Create a grid for more even distribution
     const gridSize = Math.ceil(Math.sqrt(CHAIN_LENGTH));
-    const cellWidth = playWidth / gridSize;
-    const cellHeight = playHeight / gridSize;
+    const cellWidth = availableWidth / gridSize;
+    const cellHeight = availableHeight / gridSize;
+    
+    console.log('Grid info:', { gridSize, cellWidth, cellHeight });
 
     for (let i = 0; i < CHAIN_LENGTH; i++) {
       // Get grid position
       const gridX = i % gridSize;
       const gridY = Math.floor(i / gridSize);
 
-      // Add random offset within grid cell
-      const x = PLAY_AREA.minX + (gridX * cellWidth) + (Math.random() * (cellWidth - TARGET_SIZE));
-      const y = PLAY_AREA.minY + (gridY * cellHeight) + (Math.random() * (cellHeight - TARGET_SIZE));
+      // Calculate cell boundaries
+      const cellMinX = PLAY_AREA.minX + (gridX * cellWidth);
+      const cellMinY = PLAY_AREA.minY + (gridY * cellHeight);
+      
+      // Ensure we leave padding within each cell
+      const padding = TARGET_SIZE / 2;
+      
+      // Add random offset within grid cell (with padding)
+      const x = cellMinX + padding + (Math.random() * (cellWidth - TARGET_SIZE - padding * 2));
+      const y = cellMinY + padding + (Math.random() * (cellHeight - TARGET_SIZE - padding * 2));
+      
+      // Safety check to ensure position is within bounds
+      const safeX = Math.max(PLAY_AREA.minX, Math.min(x, PLAY_AREA.maxX));
+      const safeY = Math.max(PLAY_AREA.minY, Math.min(y, PLAY_AREA.maxY));
 
-      newPositions.push({ x, y });
+      newPositions.push({ x: safeX, y: safeY });
     }
 
     // Shuffle positions
@@ -90,6 +120,7 @@ export default function ChainReaction({ onGameComplete, gameId }: ChainReactionP
     }
 
     console.log(`Generated ${newPositions.length} target positions`);
+    console.log('Target positions:', newPositions);
     setPositions(newPositions);
   }, []);
 
@@ -205,8 +236,8 @@ export default function ChainReaction({ onGameComplete, gameId }: ChainReactionP
           style={[
             styles.targetHitArea,
             {
-              left: position.x - TARGET_SIZE / 2,
-              top: position.y - TARGET_SIZE / 2,
+              left: position.x,
+              top: position.y,
               opacity: index === currentTarget ? 1 : 0,
               zIndex: index === currentTarget ? 10 : 0,
             },
