@@ -45,7 +45,7 @@ export async function submitScore(data: LeaderboardInsert): Promise<LeaderboardE
 export async function getLeaderboard(
   timeFilter: 'all' | 'monthly' | 'weekly' = 'all',
   region?: string | null,
-  limit = 100
+  limit = 50
 ): Promise<LeaderboardEntry[]> {
   try {
     let query = supabase

@@ -37,13 +37,16 @@
     "android": {
       "package": "com.sparkywoo.reactionmaster",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/icon.png",
+        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#2B0B3F"
       }
     },
     "ios": {
       "bundleIdentifier": "com.sparkywoo.reactionmaster",
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     }
   }
 }

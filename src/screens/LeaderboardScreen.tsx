@@ -72,9 +72,12 @@ export default function LeaderboardScreen({
         >
           <Text style={styles.backButtonText}>← Back</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>Leaderboard</Text>
+        <View style={styles.titleContainer}>
+          <Text style={styles.title}>Leaderboard</Text>
+          <Text style={styles.subtitle}>Top 50 Players</Text>
+        </View>
       </View>
-
+      
       <View style={styles.filters}>
         <View style={styles.filterGroup}>
           <TouchableOpacity
@@ -162,12 +165,19 @@ const styles = StyleSheet.create({
     color: theme.colors.primary.default,
     fontSize: theme.typography.sizes.lg,
   },
-  title: {
+  titleContainer: {
     flex: 1,
+    alignItems: 'center',
+  },
+  title: {
     fontSize: theme.typography.sizes.xl,
     fontWeight: theme.typography.weights.bold,
     color: theme.colors.text.primary.dark,
-    textAlign: 'center',
+  },
+  subtitle: {
+    fontSize: theme.typography.sizes.sm,
+    color: theme.colors.text.tertiary.dark,
+    marginTop: 2,
   },
   filters: {
     paddingHorizontal: theme.spacing.lg,

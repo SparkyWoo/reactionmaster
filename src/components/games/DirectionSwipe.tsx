@@ -17,14 +17,17 @@ import { theme } from '../../constants/theme';
 
 type Direction = 'up' | 'down' | 'left' | 'right';
 const DIRECTIONS: Direction[] = ['up', 'down', 'left', 'right'];
-const ARROW_SIZE = 80;
-const SWIPE_THRESHOLD = 50;
+const ARROW_SIZE = 60;
+const SWIPE_THRESHOLD = 40;
 const ANIMATION_CONFIG = {
   damping: 20,
   stiffness: 300,
   mass: 0.5,
   useNativeDriver: true,
 };
+
+const MIN_DELAY = 300;
+const MAX_DELAY = 1200;
 
 interface DirectionSwipeProps {
   onGameComplete: (score: GameScore) => void;
@@ -70,6 +73,7 @@ export default function DirectionSwipe({ onGameComplete, gameId }: DirectionSwip
   const scale = useSharedValue<number>(0.3);
   const translateX = useSharedValue<number>(0);
   const translateY = useSharedValue<number>(0);
+  const rotation = useSharedValue<number>(0);
 
   const getRandomDirection = useCallback((): Direction => {
     return DIRECTIONS[Math.floor(Math.random() * DIRECTIONS.length)];
@@ -81,8 +85,9 @@ export default function DirectionSwipe({ onGameComplete, gameId }: DirectionSwip
       scale.value = 0.3;
       translateX.value = 0;
       translateY.value = 0;
+      rotation.value = 0;
     };
-  }, [opacity, scale, translateX, translateY]);
+  }, [opacity, scale, translateX, translateY, rotation]);
 
   const showTarget = useCallback((): void => {
     if (isGameComplete) return;
@@ -90,16 +95,18 @@ export default function DirectionSwipe({ onGameComplete, gameId }: DirectionSwip
     const newDirection = getRandomDirection();
     setTargetDirection(newDirection);
 
-    const delay = Math.random() * 1000 + 500;
+    const delay = Math.random() * (MAX_DELAY - MIN_DELAY) + MIN_DELAY;
+    
     timeoutRef.current = setTimeout(() => {
       if (!isGameComplete) {
         setGameStartTime(Date.now());
         setIsTargetVisible(true);
         opacity.value = withSpring(1, ANIMATION_CONFIG);
         scale.value = withSpring(1, ANIMATION_CONFIG);
+        rotation.value = withSpring(0, ANIMATION_CONFIG);
       }
     }, delay);
-  }, [opacity, scale, isGameComplete, getRandomDirection]);
+  }, [opacity, scale, rotation, isGameComplete, getRandomDirection]);
 
   useEffect(() => {
     showTarget();
@@ -122,6 +129,11 @@ export default function DirectionSwipe({ onGameComplete, gameId }: DirectionSwip
     if (swipedDirection !== targetDirection) {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       setPenalties(prev => prev + 1);
+      
+      rotation.value = withSpring(swipedDirection === 'left' ? -30 : swipedDirection === 'right' ? 30 : 0);
+      scale.value = withSpring(0.9, ANIMATION_CONFIG, () => {
+        scale.value = withSpring(1, ANIMATION_CONFIG);
+      });
       return;
     }
 
@@ -138,7 +150,7 @@ export default function DirectionSwipe({ onGameComplete, gameId }: DirectionSwip
         finalScore: reactionTime * (penalties > 0 ? PENALTY_MULTIPLIER : 1),
       });
     });
-  }, [isTargetVisible, isGameComplete, gameStartTime, penalties, opacity, scale, onGameComplete, gameId, targetDirection]);
+  }, [isTargetVisible, isGameComplete, gameStartTime, penalties, opacity, scale, rotation, onGameComplete, gameId, targetDirection]);
 
   const gestureHandler = useAnimatedGestureHandler<PanGestureHandlerGestureEvent>({
     onStart: () => {
@@ -176,6 +188,7 @@ export default function DirectionSwipe({ onGameComplete, gameId }: DirectionSwip
       { scale: scale.value },
       { translateX: translateX.value },
       { translateY: translateY.value },
+      { rotate: `${rotation.value}deg` },
     ],
   }));
 
@@ -202,5 +215,10 @@ const styles = StyleSheet.create({
     height: ARROW_SIZE,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: theme.colors.primary.default,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
+    elevation: 5,
   },
 }); 

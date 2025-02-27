@@ -1,34 +1,31 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, StyleSheet, Dimensions } from 'react-native';
-import { TouchableWithoutFeedback } from 'react-native-gesture-handler';
-import Animated, {
-  useAnimatedStyle,
-  withSpring,
-  withTiming,
-  runOnJS,
-  useSharedValue,
-} from 'react-native-reanimated';
+import { View, StyleSheet, Dimensions, Text, TouchableOpacity } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { GameScore } from '../../types/game';
-import { TARGET_SIZE, MIN_REACTION_TIME, PENALTY_MULTIPLIER } from '../../constants/gameConstants';
+import { MIN_REACTION_TIME, PENALTY_MULTIPLIER } from '../../constants/gameConstants';
 import { theme } from '../../constants/theme';
+import Logger from '../../utils/logger';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+// Get screen dimensions
+const windowDimensions = Dimensions.get('window');
+const screenDimensions = Dimensions.get('screen');
 
-// Safe area margins to keep targets away from edges
-const MARGIN = {
-  TOP: 150,
-  BOTTOM: 100,
-  HORIZONTAL: 50,
-};
+// Log dimensions for debugging
+Logger.debug('SimpleTap: Dimensions', {
+  window: windowDimensions,
+  screen: screenDimensions
+});
 
-// Calculate actual playable area
-const PLAY_AREA = {
-  minX: MARGIN.HORIZONTAL,
-  maxX: SCREEN_WIDTH - MARGIN.HORIZONTAL - TARGET_SIZE,
-  minY: MARGIN.TOP,
-  maxY: SCREEN_HEIGHT - MARGIN.BOTTOM - TARGET_SIZE,
-};
+// Use the smaller of the two dimensions to be safe
+const SCREEN_WIDTH = Math.min(windowDimensions.width, screenDimensions.width);
+const SCREEN_HEIGHT = Math.min(windowDimensions.height, screenDimensions.height);
+
+// Very large target size for guaranteed visibility
+const TARGET_SIZE = 100;
+
+// Timing constants
+const MIN_DELAY = 500; // Minimum delay before showing target
+const MAX_DELAY = 2000; // Maximum delay before showing target
 
 interface SimpleTapProps {
   onGameComplete: (score: GameScore) => void;
@@ -38,56 +35,40 @@ interface SimpleTapProps {
 export default function SimpleTap({ onGameComplete, gameId }: SimpleTapProps): JSX.Element {
   const [gameStartTime, setGameStartTime] = useState(0);
   const [penalties, setPenalties] = useState(0);
+  const [targetVisible, setTargetVisible] = useState(false);
+  const [isComplete, setIsComplete] = useState(false);
   const timeoutRef = useRef<NodeJS.Timeout>();
 
-  // Use shared values for animation and game state
-  const isVisible = useSharedValue(false);
-  const isComplete = useSharedValue(false);
-  const opacity = useSharedValue(0);
-  const scale = useSharedValue(0.3);
-  const position = useSharedValue({ x: 0, y: 0 });
-
-  const getRandomPosition = useCallback(() => {
-    // Ensure the target stays within the playable area
-    const x = Math.random() * (PLAY_AREA.maxX - PLAY_AREA.minX) + PLAY_AREA.minX;
-    const y = Math.random() * (PLAY_AREA.maxY - PLAY_AREA.minY) + PLAY_AREA.minY;
-    return { x, y };
-  }, []);
-
+  // Show target in center position
   const showTarget = useCallback(() => {
-    if (isComplete.value) return;
+    if (isComplete) return;
 
     // Clear any existing timeout
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
     }
 
-    // Reset animation values
-    opacity.value = 0;
-    scale.value = 0.3;
-    isVisible.value = false;
+    // Hide target
+    setTargetVisible(false);
 
-    // Set new random position
-    position.value = getRandomPosition();
-
-    // Show target after random delay (1-2 seconds)
-    const delay = Math.random() * 1000 + 1000;
+    // Show target after random delay (0.5-2 seconds)
+    const delay = Math.random() * (MAX_DELAY - MIN_DELAY) + MIN_DELAY;
+    
+    Logger.debug('SimpleTap: Scheduling target to appear', { delay });
+    
     timeoutRef.current = setTimeout(() => {
-      if (!isComplete.value) {
+      if (!isComplete) {
+        Logger.debug('SimpleTap: Showing target');
         setGameStartTime(Date.now());
-        isVisible.value = true;
-        opacity.value = withSpring(1);
-        scale.value = withSpring(1);
+        setTargetVisible(true);
       }
     }, delay);
-  }, [opacity, scale, isVisible, isComplete, position]);
+  }, [isComplete]);
 
-  // Reset and start game on mount
+  // Start game on mount
   useEffect(() => {
-    isComplete.value = false;
-    isVisible.value = false;
-    opacity.value = 0;
-    scale.value = 0.3;
+    Logger.debug('SimpleTap: Game initialized');
+    setIsComplete(false);
     setPenalties(0);
     setGameStartTime(0);
     showTarget();
@@ -97,60 +78,62 @@ export default function SimpleTap({ onGameComplete, gameId }: SimpleTapProps): J
         clearTimeout(timeoutRef.current);
       }
     };
-  }, [showTarget, isComplete, isVisible, opacity, scale]);
+  }, [showTarget]);
 
   const handleScreenPress = useCallback(() => {
-    if (!isVisible.value && !isComplete.value) {
+    if (!targetVisible && !isComplete) {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       setPenalties(prev => prev + 1);
+      Logger.debug('SimpleTap: Missed tap, penalty added', { penalties: penalties + 1 });
     }
-  }, [isVisible, isComplete]);
+  }, [targetVisible, isComplete, penalties]);
 
   const handleTargetPress = useCallback(() => {
-    if (!isVisible.value || isComplete.value) return;
+    if (!targetVisible || isComplete) return;
 
     const endTime = Date.now();
     const reactionTime = endTime - gameStartTime;
     
     if (reactionTime < MIN_REACTION_TIME) return;
 
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    isComplete.value = true;
-    isVisible.value = false;
+    Logger.debug('SimpleTap: Target pressed', { reactionTime });
     
-    opacity.value = withTiming(0);
-    scale.value = withTiming(0.3, undefined, () => {
-      runOnJS(onGameComplete)({
-        gameId,
-        time: reactionTime,
-        penalties,
-        finalScore: reactionTime * (penalties > 0 ? PENALTY_MULTIPLIER : 1),
-      });
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setIsComplete(true);
+    setTargetVisible(false);
+    
+    onGameComplete({
+      gameId,
+      time: reactionTime,
+      penalties,
+      finalScore: reactionTime * (penalties > 0 ? PENALTY_MULTIPLIER : 1),
     });
-  }, [isVisible, isComplete, gameStartTime, penalties, opacity, scale, onGameComplete, gameId]);
-
-  // Separate layout and transform animations
-  const layoutStyle = useAnimatedStyle(() => ({
-    left: position.value.x,
-    top: position.value.y,
-  }));
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-    transform: [{ scale: scale.value }],
-  }));
+  }, [targetVisible, isComplete, gameStartTime, penalties, onGameComplete, gameId]);
 
   return (
-    <View style={styles.container}>
-      <View style={styles.touchArea} onTouchStart={handleScreenPress}>
-        <Animated.View style={[styles.targetWrapper, layoutStyle]}>
-          <Animated.View style={[styles.target, animatedStyle]}>
-            <TouchableWithoutFeedback onPress={handleTargetPress}>
-              <View style={styles.targetInner} />
-            </TouchableWithoutFeedback>
-          </Animated.View>
-        </Animated.View>
-      </View>
+    <View style={styles.container} onTouchStart={handleScreenPress}>
+      {/* Center target */}
+      {targetVisible && (
+        <TouchableOpacity 
+          style={styles.target}
+          onPress={handleTargetPress}
+          activeOpacity={0.8}
+        >
+          <View style={styles.targetInner} />
+        </TouchableOpacity>
+      )}
+      
+      {/* Debug indicator */}
+      {__DEV__ && (
+        <View style={styles.debugContainer}>
+          <Text style={styles.debugText}>
+            {targetVisible ? 'Target Visible' : 'Target Hidden'}
+          </Text>
+          <Text style={styles.debugText}>
+            Center: {Math.round(SCREEN_WIDTH/2)}, {Math.round(SCREEN_HEIGHT/2)}
+          </Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -159,27 +142,42 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background.dark,
-  },
-  touchArea: {
-    flex: 1,
-    width: '100%',
-    backgroundColor: 'transparent',
-  },
-  targetWrapper: {
-    position: 'absolute',
-    width: TARGET_SIZE,
-    height: TARGET_SIZE,
-  },
-  target: {
-    width: '100%',
-    height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  targetInner: {
+  target: {
     width: TARGET_SIZE,
     height: TARGET_SIZE,
     borderRadius: TARGET_SIZE / 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    // Add shadow for better visibility
+    shadowColor: '#FFFFFF',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 20,
+    elevation: 20,
+  },
+  targetInner: {
+    width: TARGET_SIZE * 0.8,
+    height: TARGET_SIZE * 0.8,
+    borderRadius: (TARGET_SIZE * 0.8) / 2,
     backgroundColor: theme.colors.primary.default,
+    borderWidth: 4,
+    borderColor: '#FFFFFF',
+  },
+  // Debug styles
+  debugContainer: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    padding: 5,
+    borderRadius: 5,
+  },
+  debugText: {
+    color: '#FFFFFF',
+    fontSize: 12,
   },
 }); 

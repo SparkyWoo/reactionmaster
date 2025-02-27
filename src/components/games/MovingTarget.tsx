@@ -11,10 +11,13 @@ import Animated, {
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { GameScore } from '../../types/game';
-import { MIN_REACTION_TIME, PENALTY_MULTIPLIER, TARGET_SIZE } from '../../constants/gameConstants';
+import { MIN_REACTION_TIME, PENALTY_MULTIPLIER } from '../../constants/gameConstants';
 import { theme } from '../../constants/theme';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+// Reduced target size for more challenge
+const TARGET_SIZE = 40;
 
 // Safe area margins to keep targets away from edges
 const MARGIN = {
@@ -31,10 +34,10 @@ const PLAY_AREA = {
   maxY: SCREEN_HEIGHT - MARGIN.BOTTOM - TARGET_SIZE,
 };
 
-// Animation timing constants
-const MOVE_DURATION = 500; // Increased from 300ms to 500ms for slower movement
-const INITIAL_DELAY = 500; // 500ms initial delay
-const MOVE_INTERVAL = 600; // Increased from 400ms to 600ms for more time between movements
+// Animation timing constants - made faster
+const MOVE_DURATION = 300; // Reduced from 500ms to 300ms for faster movement
+const INITIAL_DELAY = 300; // Reduced from 500ms to 300ms for quicker start
+const MOVE_INTERVAL = 400; // Reduced from 600ms to 400ms for more frequent movements
 
 interface MovingTargetProps {
   onGameComplete: (score: GameScore) => void;
@@ -67,7 +70,7 @@ export default function MovingTarget({ onGameComplete, gameId }: MovingTargetPro
     const newPosition = getRandomPosition();
     position.value = withTiming(newPosition, { 
       duration: MOVE_DURATION,
-      easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+      easing: Easing.bezier(0.25, 0.1, 0.25, 1), // Snappier easing
     });
 
     moveTimeoutRef.current = setTimeout(moveTarget, MOVE_INTERVAL);
