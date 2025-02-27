@@ -13,8 +13,8 @@ import { MIN_REACTION_TIME, PENALTY_MULTIPLIER } from '../../constants/gameConst
 import { theme } from '../../constants/theme';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const TARGET_SIZE = 50;
-const CHAIN_LENGTH = 5;
+const TARGET_SIZE = 45;
+const CHAIN_LENGTH = 7;
 const MIN_DELAY = 50;
 const MAX_DELAY = 200;
 

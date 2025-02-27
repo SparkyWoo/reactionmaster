@@ -17,8 +17,8 @@ import { theme } from '../../constants/theme';
 
 type Direction = 'up' | 'down' | 'left' | 'right';
 const DIRECTIONS: Direction[] = ['up', 'down', 'left', 'right'];
-const ARROW_SIZE = 60;
-const SWIPE_THRESHOLD = 40;
+const ARROW_SIZE = 50;
+const SWIPE_THRESHOLD = 50;
 const ANIMATION_CONFIG = {
   damping: 20,
   stiffness: 300,
@@ -26,8 +26,8 @@ const ANIMATION_CONFIG = {
   useNativeDriver: true,
 };
 
-const MIN_DELAY = 300;
-const MAX_DELAY = 1200;
+const MIN_DELAY = 200;
+const MAX_DELAY = 800;
 
 interface DirectionSwipeProps {
   onGameComplete: (score: GameScore) => void;

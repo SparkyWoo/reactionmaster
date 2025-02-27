@@ -17,7 +17,7 @@ import { theme } from '../../constants/theme';
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 // Reduced target size for more challenge
-const TARGET_SIZE = 40;
+const TARGET_SIZE = 35;
 
 // Safe area margins to keep targets away from edges
 const MARGIN = {
@@ -35,9 +35,9 @@ const PLAY_AREA = {
 };
 
 // Animation timing constants - made faster
-const MOVE_DURATION = 300; // Reduced from 500ms to 300ms for faster movement
-const INITIAL_DELAY = 300; // Reduced from 500ms to 300ms for quicker start
-const MOVE_INTERVAL = 400; // Reduced from 600ms to 400ms for more frequent movements
+const MOVE_DURATION = 250; // Reduced from 300ms to 250ms for even faster movement
+const INITIAL_DELAY = 250; // Reduced from 300ms to 250ms for quicker start
+const MOVE_INTERVAL = 300; // Reduced from 400ms to 300ms for more frequent movements
 
 interface MovingTargetProps {
   onGameComplete: (score: GameScore) => void;

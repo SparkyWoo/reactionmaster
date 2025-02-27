@@ -21,11 +21,11 @@ const SCREEN_WIDTH = Math.min(windowDimensions.width, screenDimensions.width);
 const SCREEN_HEIGHT = Math.min(windowDimensions.height, screenDimensions.height);
 
 // Very large target size for guaranteed visibility
-const TARGET_SIZE = 100;
+const TARGET_SIZE = 80;
 
 // Timing constants
-const MIN_DELAY = 500; // Minimum delay before showing target
-const MAX_DELAY = 2000; // Maximum delay before showing target
+const MIN_DELAY = 700;
+const MAX_DELAY = 3000;
 
 interface SimpleTapProps {
   onGameComplete: (score: GameScore) => void;
